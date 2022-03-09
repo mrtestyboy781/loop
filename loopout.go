@@ -23,6 +23,7 @@ import (
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/lntypes"
 	"github.com/lightningnetwork/lnd/zpay32"
+    "github.com/lightningnetwork/lnd/keychain"
 )
 
 // loopInternalHops indicate the number of hops that a loop out swap makes in
@@ -74,6 +75,8 @@ type loopOutSwap struct {
 	prePaymentChan  chan paymentResult
 
 	wg sync.WaitGroup
+
+    keyDesc *keychain.KeyDescriptor
 }
 
 // executeConfig contains extra configuration to execute the swap.
@@ -210,6 +213,7 @@ func newLoopOutSwap(globalCtx context.Context, cfg *swapConfig,
 		swapKit:                *swapKit,
 		htlc:                   htlc,
 		swapInvoicePaymentAddr: *paymentAddr,
+        keyDesc:                keyDesc,
 	}
 
 	// Persist the data before exiting this function, so that the caller
@@ -1287,7 +1291,7 @@ func (s *loopOutSwap) sweep(ctx context.Context,
 	// Create sweep tx.
 	sweepTx, err := s.sweeper.CreateSweepTx(
 		ctx, s.height, s.htlc.SuccessSequence(), s.htlc, htlcOutpoint,
-		s.ReceiverKey, witnessFunc, htlcValue, fee, s.DestAddr,
+		s.ReceiverKey, witnessFunc, htlcValue, fee, s.DestAddr, s.keyDesc,
 	)
 	if err != nil {
 		return err
