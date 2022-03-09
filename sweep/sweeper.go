@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/btcsuite/btcd/btcec"
+    "github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
@@ -26,7 +26,8 @@ func (s *Sweeper) CreateSweepTx(
 	keyBytes [33]byte,
 	witnessFunc func(sig []byte) (wire.TxWitness, error),
 	amount, fee btcutil.Amount,
-	destAddr btcutil.Address) (*wire.MsgTx, error) {
+	destAddr btcutil.Address,
+    keyDesc* keychain.KeyDescriptor,  log *swap.PrefixLog) (*wire.MsgTx, error) {
 
 	// Compose tx.
 	sweepTx := wire.NewMsgTx(2)
@@ -53,22 +54,32 @@ func (s *Sweeper) CreateSweepTx(
 
 	// Generate a signature for the swap htlc transaction.
 
-	key, err := btcec.ParsePubKey(keyBytes[:], btcec.S256())
+
+    witnessScript := htlc.Script()
+
+    p2wshPkScript, err := input.WitnessScriptHash(witnessScript)
 	if err != nil {
 		return nil, err
 	}
 
+    key, err := btcec.ParsePubKey(keyBytes[:], btcec.S256())
+    log.Infof("======== KEY DESCRIPTOR==========  %+v\n  %", *keyDesc)
+    log.Infof("======== witnessScript ==========  %+v\n  %", witnessScript)
+
 	signDesc := lndclient.SignDescriptor{
-		WitnessScript: htlc.Script(),
+		WitnessScript: witnessScript,
 		Output: &wire.TxOut{
 			Value: int64(amount),
+            PkScript: p2wshPkScript,
 		},
 		HashType:   txscript.SigHashAll,
 		InputIndex: 0,
 		KeyDesc: keychain.KeyDescriptor{
-			PubKey: key,
-		},
+           PubKey: key,
+           KeyLocator: keyDesc.KeyLocator,
+        },
 	}
+    log.Infof("======== SignDesc ==========  %+v\n  %", signDesc)
 
 	rawSigs, err := s.Lnd.Signer.SignOutputRaw(
 		globalCtx, sweepTx, []*lndclient.SignDescriptor{&signDesc},

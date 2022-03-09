@@ -24,6 +24,7 @@ import (
 	"github.com/lightningnetwork/lnd/lnwallet/chainfee"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/routing/route"
+    "github.com/lightningnetwork/lnd/keychain"
 )
 
 var (
@@ -68,6 +69,8 @@ type loopInSwap struct {
 	timeoutAddr btcutil.Address
 
 	wg sync.WaitGroup
+
+    keyDesc *keychain.KeyDescriptor
 }
 
 // loopInInitResult contains information about a just-initiated loop in swap.
@@ -258,6 +261,7 @@ func newLoopInSwap(globalCtx context.Context, cfg *swapConfig,
 	swap := &loopInSwap{
 		LoopInContract: contract,
 		swapKit:        *swapKit,
+        keyDesc:         keyDesc,
 	}
 
 	if err := swap.initHtlcs(); err != nil {
@@ -944,7 +948,7 @@ func (s *loopInSwap) publishTimeoutTx(ctx context.Context,
 	sequence := uint32(0)
 	timeoutTx, err := s.sweeper.CreateSweepTx(
 		ctx, s.height, sequence, s.htlc, *htlcOutpoint, s.SenderKey,
-		witnessFunc, htlcValue, fee, s.timeoutAddr,
+		witnessFunc, htlcValue, fee, s.timeoutAddr, s.keyDesc, s.log,
 	)
 	if err != nil {
 		return 0, err
